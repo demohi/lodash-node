@@ -1,11 +1,3 @@
-/**
- * Lo-Dash 3.0.0-pre (Custom Build) <http://lodash.com/>
- * Build: `lodash modularize modern exports="node" -o ./modern/`
- * Copyright 2012-2014 The Dojo Foundation <http://dojofoundation.org/>
- * Based on Underscore.js 1.6.0 <http://underscorejs.org/LICENSE>
- * Copyright 2009-2014 Jeremy Ashkenas, DocumentCloud and Investigative Reporters & Editors
- * Available under MIT license <http://lodash.com/license>
- */
 var createCompounder = require('../internal/createCompounder');
 
 /**
@@ -15,18 +7,18 @@ var createCompounder = require('../internal/createCompounder');
  * @static
  * @memberOf _
  * @category String
- * @param {string} [string=''] The string to snake case.
+ * @param {string} [string=''] The string to convert.
  * @returns {string} Returns the snake cased string.
  * @example
  *
- * _.snakeCase('Hello world');
- * // => 'hello_world'
+ * _.snakeCase('Foo Bar');
+ * // => 'foo_bar'
  *
- * _.snakeCase('--hello-world');
- * // => 'hello_world'
+ * _.snakeCase('--foo-bar');
+ * // => 'foo_bar'
  *
- * _.snakeCase('helloWorld');
- * // => 'hello_world'
+ * _.snakeCase('fooBar');
+ * // => 'foo_bar'
  */
 var snakeCase = createCompounder(function(result, word, index) {
   return result + (index ? '_' : '') + word.toLowerCase();

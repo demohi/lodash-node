@@ -1,229 +1,278 @@
 /**
  * @license
- * Lo-Dash 3.0.0-pre (Custom Build) <http://lodash.com/>
- * Build: `lodash modularize exports="node" -o ./compat/`
- * Copyright 2012-2014 The Dojo Foundation <http://dojofoundation.org/>
- * Based on Underscore.js 1.6.0 <http://underscorejs.org/LICENSE>
- * Copyright 2009-2014 Jeremy Ashkenas, DocumentCloud and Investigative Reporters & Editors
- * Available under MIT license <http://lodash.com/license>
+ * Lo-Dash 3.0.0 (Custom Build) <https://lodash.com/>
+ * Build: `lodash modularize exports="node" -o ./compat`
+ * Copyright 2012-2015 The Dojo Foundation <http://dojofoundation.org/>
+ * Based on Underscore.js 1.7.0 <http://underscorejs.org/LICENSE>
+ * Copyright 2009-2015 Jeremy Ashkenas, DocumentCloud and Investigative Reporters & Editors
+ * Available under MIT license <https://lodash.com/license>
  */
-var arrays = require('./array'),
-    chaining = require('./chain'),
-    collections = require('./collection'),
-    functions = require('./function'),
-    objects = require('./object'),
-    strings = require('./string'),
-    utilities = require('./utility'),
+var array = require('./array'),
+    chain = require('./chain'),
+    collection = require('./collection'),
+    date = require('./date'),
+    func = require('./function'),
+    lang = require('./lang'),
+    number = require('./number'),
+    object = require('./object'),
+    string = require('./string'),
+    utility = require('./utility'),
+    LazyWrapper = require('./internal/LazyWrapper'),
+    LodashWrapper = require('./internal/LodashWrapper'),
     arrayEach = require('./internal/arrayEach'),
-    baseAssign = require('./internal/baseAssign'),
+    baseCallback = require('./internal/baseCallback'),
     baseForOwn = require('./internal/baseForOwn'),
     baseFunctions = require('./internal/baseFunctions'),
+    isArray = require('./lang/isArray'),
+    isObject = require('./lang/isObject'),
     keys = require('./object/keys'),
+    lazyClone = require('./internal/lazyClone'),
+    lazyReverse = require('./internal/lazyReverse'),
+    lazyValue = require('./internal/lazyValue'),
     lodash = require('./chain/lodash'),
-    lodashWrapper = require('./internal/lodashWrapper'),
+    matches = require('./utility/matches'),
     mixin = require('./utility/mixin'),
-    support = require('./support');
+    property = require('./utility/property'),
+    support = require('./support'),
+    thru = require('./chain/thru');
 
-/** Used as the semantic version number */
-var version = '3.0.0-pre';
+/** Used as the semantic version number. */
+var VERSION = '3.0.0';
 
-/** Used for native method references */
+/** Used to indicate the type of lazy iteratees. */
+var LAZY_FILTER_FLAG = 0,
+    LAZY_WHILE_FLAG = 2;
+
+/** Used for native method references. */
 var arrayProto = Array.prototype;
+
+/** Native method references. */
+var push = arrayProto.push,
+    splice = arrayProto.splice,
+    unshift = arrayProto.unshift;
+
+/* Native method references for those with the same name as other `lodash` methods. */
+var nativeMax = Math.max,
+    nativeMin = Math.min;
 
 // wrap `_.mixin` so it works when provided only one argument
 mixin = (function(func) {
   return function(object, source, options) {
-    if (!source || (!options && !baseFunctions(source, keys).length)) {
-      if (options == null) {
+    if (options == null) {
+      var isObj = isObject(source),
+          props = isObj && keys(source),
+          methodNames = props && props.length && baseFunctions(source, props);
+
+      if (!(methodNames ? methodNames.length : isObj)) {
         options = source;
+        source = object;
+        object = this;
       }
-      source = object;
-      object = this;
     }
     return func(object, source, options);
   };
 }(mixin));
 
-// add functions that return wrapped values when chaining
-lodash.after = functions.after;
-lodash.assign = objects.assign;
-lodash.at = collections.at;
-lodash.bind = functions.bind;
-lodash.bindAll = functions.bindAll;
-lodash.bindKey = functions.bindKey;
-lodash.callback = utilities.callback;
-lodash.chain = chaining.chain;
-lodash.chunk = arrays.chunk;
-lodash.compact = arrays.compact;
-lodash.compose = functions.compose;
-lodash.constant = utilities.constant;
-lodash.countBy = collections.countBy;
-lodash.create = objects.create;
-lodash.curry = functions.curry;
-lodash.debounce = functions.debounce;
-lodash.defaults = objects.defaults;
-lodash.defer = functions.defer;
-lodash.delay = functions.delay;
-lodash.difference = arrays.difference;
-lodash.drop = arrays.drop;
-lodash.dropRight = arrays.dropRight;
-lodash.dropRightWhile = arrays.dropRightWhile;
-lodash.dropWhile = arrays.dropWhile;
-lodash.filter = collections.filter;
-lodash.flatten = arrays.flatten;
-lodash.forEach = collections.forEach;
-lodash.forEachRight = collections.forEachRight;
-lodash.forIn = objects.forIn;
-lodash.forInRight = objects.forInRight;
-lodash.forOwn = objects.forOwn;
-lodash.forOwnRight = objects.forOwnRight;
-lodash.functions = objects.functions;
-lodash.groupBy = collections.groupBy;
-lodash.indexBy = collections.indexBy;
-lodash.initial = arrays.initial;
-lodash.intersection = arrays.intersection;
-lodash.invert = objects.invert;
-lodash.invoke = collections.invoke;
+// Add functions that return wrapped values when chaining.
+lodash.after = func.after;
+lodash.ary = func.ary;
+lodash.assign = object.assign;
+lodash.at = collection.at;
+lodash.before = func.before;
+lodash.bind = func.bind;
+lodash.bindAll = func.bindAll;
+lodash.bindKey = func.bindKey;
+lodash.callback = utility.callback;
+lodash.chain = chain.chain;
+lodash.chunk = array.chunk;
+lodash.compact = array.compact;
+lodash.constant = utility.constant;
+lodash.countBy = collection.countBy;
+lodash.create = object.create;
+lodash.curry = func.curry;
+lodash.curryRight = func.curryRight;
+lodash.debounce = func.debounce;
+lodash.defaults = object.defaults;
+lodash.defer = func.defer;
+lodash.delay = func.delay;
+lodash.difference = array.difference;
+lodash.drop = array.drop;
+lodash.dropRight = array.dropRight;
+lodash.dropRightWhile = array.dropRightWhile;
+lodash.dropWhile = array.dropWhile;
+lodash.filter = collection.filter;
+lodash.flatten = array.flatten;
+lodash.flattenDeep = array.flattenDeep;
+lodash.flow = func.flow;
+lodash.flowRight = func.flowRight;
+lodash.forEach = collection.forEach;
+lodash.forEachRight = collection.forEachRight;
+lodash.forIn = object.forIn;
+lodash.forInRight = object.forInRight;
+lodash.forOwn = object.forOwn;
+lodash.forOwnRight = object.forOwnRight;
+lodash.functions = object.functions;
+lodash.groupBy = collection.groupBy;
+lodash.indexBy = collection.indexBy;
+lodash.initial = array.initial;
+lodash.intersection = array.intersection;
+lodash.invert = object.invert;
+lodash.invoke = collection.invoke;
 lodash.keys = keys;
-lodash.keysIn = objects.keysIn;
-lodash.map = collections.map;
-lodash.mapValues = objects.mapValues;
-lodash.matches = utilities.matches;
-lodash.memoize = functions.memoize;
-lodash.merge = objects.merge;
+lodash.keysIn = object.keysIn;
+lodash.map = collection.map;
+lodash.mapValues = object.mapValues;
+lodash.matches = matches;
+lodash.memoize = func.memoize;
+lodash.merge = object.merge;
 lodash.mixin = mixin;
-lodash.negate = functions.negate;
-lodash.omit = objects.omit;
-lodash.once = functions.once;
-lodash.pairs = objects.pairs;
-lodash.partial = functions.partial;
-lodash.partialRight = functions.partialRight;
-lodash.partition = collections.partition;
-lodash.pick = objects.pick;
-lodash.pluck = collections.pluck;
-lodash.property = utilities.property;
-lodash.pull = arrays.pull;
-lodash.pullAt = arrays.pullAt;
-lodash.range = utilities.range;
-lodash.reject = collections.reject;
-lodash.remove = arrays.remove;
-lodash.rest = arrays.rest;
-lodash.shuffle = collections.shuffle;
-lodash.slice = arrays.slice;
-lodash.sortBy = collections.sortBy;
-lodash.take = arrays.take;
-lodash.takeRight = arrays.takeRight;
-lodash.takeRightWhile = arrays.takeRightWhile;
-lodash.takeWhile = arrays.takeWhile;
-lodash.tap = chaining.tap;
-lodash.throttle = functions.throttle;
-lodash.times = utilities.times;
-lodash.toArray = collections.toArray;
-lodash.transform = objects.transform;
-lodash.union = arrays.union;
-lodash.uniq = arrays.uniq;
-lodash.values = objects.values;
-lodash.valuesIn = objects.valuesIn;
-lodash.where = collections.where;
-lodash.without = arrays.without;
-lodash.wrap = functions.wrap;
-lodash.xor = arrays.xor;
-lodash.zip = arrays.zip;
-lodash.zipObject = arrays.zipObject;
+lodash.negate = func.negate;
+lodash.omit = object.omit;
+lodash.once = func.once;
+lodash.pairs = object.pairs;
+lodash.partial = func.partial;
+lodash.partialRight = func.partialRight;
+lodash.partition = collection.partition;
+lodash.pick = object.pick;
+lodash.pluck = collection.pluck;
+lodash.property = property;
+lodash.propertyOf = utility.propertyOf;
+lodash.pull = array.pull;
+lodash.pullAt = array.pullAt;
+lodash.range = utility.range;
+lodash.rearg = func.rearg;
+lodash.reject = collection.reject;
+lodash.remove = array.remove;
+lodash.rest = array.rest;
+lodash.shuffle = collection.shuffle;
+lodash.slice = array.slice;
+lodash.sortBy = collection.sortBy;
+lodash.sortByAll = collection.sortByAll;
+lodash.take = array.take;
+lodash.takeRight = array.takeRight;
+lodash.takeRightWhile = array.takeRightWhile;
+lodash.takeWhile = array.takeWhile;
+lodash.tap = chain.tap;
+lodash.throttle = func.throttle;
+lodash.thru = thru;
+lodash.times = utility.times;
+lodash.toArray = lang.toArray;
+lodash.toPlainObject = lang.toPlainObject;
+lodash.transform = object.transform;
+lodash.union = array.union;
+lodash.uniq = array.uniq;
+lodash.unzip = array.unzip;
+lodash.values = object.values;
+lodash.valuesIn = object.valuesIn;
+lodash.where = collection.where;
+lodash.without = array.without;
+lodash.wrap = func.wrap;
+lodash.xor = array.xor;
+lodash.zip = array.zip;
+lodash.zipObject = array.zipObject;
 
-// add aliases
-lodash.collect = collections.map;
-lodash.each = collections.forEach;
-lodash.eachRight = collections.forEachRight;
-lodash.extend = objects.assign;
-lodash.methods = objects.functions;
-lodash.object = arrays.zipObject;
-lodash.select = collections.filter;
-lodash.tail = arrays.rest;
-lodash.unique = arrays.uniq;
-lodash.unzip = arrays.zip;
+// Add aliases.
+lodash.backflow = func.flowRight;
+lodash.collect = collection.map;
+lodash.compose = func.flowRight;
+lodash.each = collection.forEach;
+lodash.eachRight = collection.forEachRight;
+lodash.extend = object.assign;
+lodash.iteratee = utility.callback;
+lodash.methods = object.functions;
+lodash.object = array.zipObject;
+lodash.select = collection.filter;
+lodash.tail = array.rest;
+lodash.unique = array.uniq;
 
-// add functions to `lodash.prototype`
-mixin(lodash, baseAssign({}, lodash));
+// Add functions to `lodash.prototype`.
+mixin(lodash, lodash);
 
-// add functions that return unwrapped values when chaining
-lodash.camelCase = strings.camelCase;
-lodash.capitalize = strings.capitalize;
-lodash.clone = objects.clone;
-lodash.cloneDeep = objects.cloneDeep;
-lodash.contains = collections.contains;
-lodash.endsWith = strings.endsWith;
-lodash.escape = strings.escape;
-lodash.escapeRegExp = strings.escapeRegExp;
-lodash.every = collections.every;
-lodash.find = collections.find;
-lodash.findIndex = arrays.findIndex;
-lodash.findKey = objects.findKey;
-lodash.findLast = collections.findLast;
-lodash.findLastIndex = arrays.findLastIndex;
-lodash.findLastKey = objects.findLastKey;
-lodash.findWhere = collections.findWhere;
-lodash.first = arrays.first;
-lodash.has = objects.has;
-lodash.identity = utilities.identity;
-lodash.indexOf = arrays.indexOf;
-lodash.isArguments = objects.isArguments;
-lodash.isArray = objects.isArray;
-lodash.isBoolean = objects.isBoolean;
-lodash.isDate = objects.isDate;
-lodash.isElement = objects.isElement;
-lodash.isEmpty = objects.isEmpty;
-lodash.isEqual = objects.isEqual;
-lodash.isError = objects.isError;
-lodash.isFinite = objects.isFinite;
-lodash.isFunction = objects.isFunction;
-lodash.isNaN = objects.isNaN;
-lodash.isNull = objects.isNull;
-lodash.isNumber = objects.isNumber;
-lodash.isObject = objects.isObject;
-lodash.isPlainObject = objects.isPlainObject;
-lodash.isRegExp = objects.isRegExp;
-lodash.isString = objects.isString;
-lodash.isUndefined = objects.isUndefined;
-lodash.kebabCase = strings.kebabCase;
-lodash.last = arrays.last;
-lodash.lastIndexOf = arrays.lastIndexOf;
-lodash.max = collections.max;
-lodash.min = collections.min;
-lodash.noConflict = utilities.noConflict;
-lodash.noop = utilities.noop;
-lodash.now = utilities.now;
-lodash.pad = strings.pad;
-lodash.padLeft = strings.padLeft;
-lodash.padRight = strings.padRight;
-lodash.parseInt = utilities.parseInt;
-lodash.random = utilities.random;
-lodash.reduce = collections.reduce;
-lodash.reduceRight = collections.reduceRight;
-lodash.repeat = strings.repeat;
-lodash.result = utilities.result;
-lodash.size = collections.size;
-lodash.some = collections.some;
-lodash.sortedIndex = arrays.sortedIndex;
-lodash.snakeCase = strings.snakeCase;
-lodash.startsWith = strings.startsWith;
-lodash.template = strings.template;
-lodash.trim = strings.trim;
-lodash.trimLeft = strings.trimLeft;
-lodash.trimRight = strings.trimRight;
-lodash.trunc = strings.trunc;
-lodash.unescape = strings.unescape;
-lodash.uniqueId = utilities.uniqueId;
+// Add functions that return unwrapped values when chaining.
+lodash.attempt = utility.attempt;
+lodash.camelCase = string.camelCase;
+lodash.capitalize = string.capitalize;
+lodash.clone = lang.clone;
+lodash.cloneDeep = lang.cloneDeep;
+lodash.deburr = string.deburr;
+lodash.endsWith = string.endsWith;
+lodash.escape = string.escape;
+lodash.escapeRegExp = string.escapeRegExp;
+lodash.every = collection.every;
+lodash.find = collection.find;
+lodash.findIndex = array.findIndex;
+lodash.findKey = object.findKey;
+lodash.findLast = collection.findLast;
+lodash.findLastIndex = array.findLastIndex;
+lodash.findLastKey = object.findLastKey;
+lodash.findWhere = collection.findWhere;
+lodash.first = array.first;
+lodash.has = object.has;
+lodash.identity = utility.identity;
+lodash.includes = collection.includes;
+lodash.indexOf = array.indexOf;
+lodash.isArguments = lang.isArguments;
+lodash.isArray = isArray;
+lodash.isBoolean = lang.isBoolean;
+lodash.isDate = lang.isDate;
+lodash.isElement = lang.isElement;
+lodash.isEmpty = lang.isEmpty;
+lodash.isEqual = lang.isEqual;
+lodash.isError = lang.isError;
+lodash.isFinite = lang.isFinite;
+lodash.isFunction = lang.isFunction;
+lodash.isMatch = lang.isMatch;
+lodash.isNaN = lang.isNaN;
+lodash.isNative = lang.isNative;
+lodash.isNull = lang.isNull;
+lodash.isNumber = lang.isNumber;
+lodash.isObject = isObject;
+lodash.isPlainObject = lang.isPlainObject;
+lodash.isRegExp = lang.isRegExp;
+lodash.isString = lang.isString;
+lodash.isTypedArray = lang.isTypedArray;
+lodash.isUndefined = lang.isUndefined;
+lodash.kebabCase = string.kebabCase;
+lodash.last = array.last;
+lodash.lastIndexOf = array.lastIndexOf;
+lodash.max = collection.max;
+lodash.min = collection.min;
+lodash.noop = utility.noop;
+lodash.now = date.now;
+lodash.pad = string.pad;
+lodash.padLeft = string.padLeft;
+lodash.padRight = string.padRight;
+lodash.parseInt = string.parseInt;
+lodash.random = number.random;
+lodash.reduce = collection.reduce;
+lodash.reduceRight = collection.reduceRight;
+lodash.repeat = string.repeat;
+lodash.result = object.result;
+lodash.size = collection.size;
+lodash.snakeCase = string.snakeCase;
+lodash.some = collection.some;
+lodash.sortedIndex = array.sortedIndex;
+lodash.sortedLastIndex = array.sortedLastIndex;
+lodash.startsWith = string.startsWith;
+lodash.template = string.template;
+lodash.trim = string.trim;
+lodash.trimLeft = string.trimLeft;
+lodash.trimRight = string.trimRight;
+lodash.trunc = string.trunc;
+lodash.unescape = string.unescape;
+lodash.uniqueId = utility.uniqueId;
+lodash.words = string.words;
 
-// add aliases
-lodash.all = collections.every;
-lodash.any = collections.some;
-lodash.detect = collections.find;
-lodash.foldl = collections.reduce;
-lodash.foldr = collections.reduceRight;
-lodash.head = arrays.first;
-lodash.include = collections.contains;
-lodash.inject = collections.reduce;
+// Add aliases.
+lodash.all = collection.every;
+lodash.any = collection.some;
+lodash.contains = collection.includes;
+lodash.detect = collection.find;
+lodash.foldl = collection.reduce;
+lodash.foldr = collection.reduceRight;
+lodash.head = array.first;
+lodash.include = collection.includes;
+lodash.inject = collection.reduce;
 
 mixin(lodash, (function() {
   var source = {};
@@ -235,22 +284,17 @@ mixin(lodash, (function() {
   return source;
 }()), false);
 
-// add functions capable of returning wrapped and unwrapped values when chaining
-lodash.sample = collections.sample;
+// Add functions capable of returning wrapped and unwrapped values when chaining.
+lodash.sample = collection.sample;
 
-baseForOwn(lodash, function(func, methodName) {
-  var callbackable = methodName != 'sample';
-  if (!lodash.prototype[methodName]) {
-    lodash.prototype[methodName] = function(n, guard) {
-      var chainAll = this.__chain__,
-          result = func(this.__wrapped__, n, guard);
-
-      return !chainAll && (n == null || (guard && !(callbackable && typeof n == 'function')))
-        ? result
-        : new lodashWrapper(result, chainAll);
-    };
+lodash.prototype.sample = function(n) {
+  if (!this.__chain__ && n == null) {
+    return collection.sample(this.value());
   }
-});
+  return this.thru(function(value) {
+    return collection.sample(value, n);
+  });
+};
 
 /**
  * The semantic version number.
@@ -259,68 +303,197 @@ baseForOwn(lodash, function(func, methodName) {
  * @memberOf _
  * @type string
  */
-lodash.VERSION = version;
+lodash.VERSION = VERSION;
 
 lodash.support = support;
-(lodash.templateSettings = strings.templateSettings).imports._ = lodash;
+(lodash.templateSettings = string.templateSettings).imports._ = lodash;
 
-// add "Chaining" functions to the wrapper
-lodash.prototype.chain = chaining.wrapperChain;
-lodash.prototype.toJSON = chaining.wrapperValueOf;
-lodash.prototype.toString = chaining.wrapperToString;
-lodash.prototype.value = chaining.wrapperValueOf;
-lodash.prototype.valueOf = chaining.wrapperValueOf;
+// Assign default placeholders.
+arrayEach(['bind', 'bindKey', 'curry', 'curryRight', 'partial', 'partialRight'], function(methodName) {
+  lodash[methodName].placeholder = lodash;
+});
 
-// add `Array` functions that return unwrapped values
-arrayEach(['join', 'pop', 'shift'], function(methodName) {
-  var func = arrayProto[methodName];
-  lodash.prototype[methodName] = function() {
-    var chainAll = this.__chain__,
-        result = func.apply(this.__wrapped__, arguments);
+// Add `LazyWrapper` methods that accept an `iteratee` value.
+arrayEach(['filter', 'map', 'takeWhile'], function(methodName, index) {
+  var isFilter = index == LAZY_FILTER_FLAG;
 
-    return chainAll
-      ? new lodashWrapper(result, chainAll)
-      : result;
+  LazyWrapper.prototype[methodName] = function(iteratee, thisArg) {
+    var result = this.clone(),
+        filtered = result.filtered,
+        iteratees = result.iteratees || (result.iteratees = []);
+
+    result.filtered = filtered || isFilter || (index == LAZY_WHILE_FLAG && result.dir < 0);
+    iteratees.push({ 'iteratee': baseCallback(iteratee, thisArg, 3), 'type': index });
+    return result;
   };
 });
 
-// add `Array` functions that return the existing wrapped value
-arrayEach(['push', 'reverse', 'sort', 'unshift'], function(methodName) {
-  var func = arrayProto[methodName];
-  lodash.prototype[methodName] = function() {
-    func.apply(this.__wrapped__, arguments);
-    return this;
+// Add `LazyWrapper` methods for `_.drop` and `_.take` variants.
+arrayEach(['drop', 'take'], function(methodName, index) {
+  var countName = methodName + 'Count',
+      whileName = methodName + 'While';
+
+  LazyWrapper.prototype[methodName] = function(n) {
+    n = n == null ? 1 : nativeMax(+n || 0, 0);
+
+    var result = this.clone();
+    if (result.filtered) {
+      var value = result[countName];
+      result[countName] = index ? nativeMin(value, n) : (value + n);
+    } else {
+      var views = result.views || (result.views = []);
+      views.push({ 'size': n, 'type': methodName + (result.dir < 0 ? 'Right' : '') });
+    }
+    return result;
+  };
+
+  LazyWrapper.prototype[methodName + 'Right'] = function(n) {
+    return this.reverse()[methodName](n).reverse();
+  };
+
+  LazyWrapper.prototype[methodName + 'RightWhile'] = function(predicate, thisArg) {
+    return this.reverse()[whileName](predicate, thisArg).reverse();
   };
 });
 
-// add `Array` functions that return new wrapped values
-arrayEach(['concat', 'splice'], function(methodName) {
-  var func = arrayProto[methodName];
-  lodash.prototype[methodName] = function() {
-    return new lodashWrapper(func.apply(this.__wrapped__, arguments), this.__chain__);
+// Add `LazyWrapper` methods for `_.first` and `_.last`.
+arrayEach(['first', 'last'], function(methodName, index) {
+  var takeName = 'take' + (index ? 'Right': '');
+
+  LazyWrapper.prototype[methodName] = function() {
+    return this[takeName](1).value()[0];
   };
 });
 
-// avoid array-like object bugs with `Array#shift` and `Array#splice`
-// in IE < 9, Firefox < 10, Narwhal, and RingoJS
-if (!support.spliceObjects) {
-  arrayEach(['pop', 'shift', 'splice'], function(methodName) {
-    var func = arrayProto[methodName],
-        isSplice = methodName == 'splice';
+// Add `LazyWrapper` methods for `_.initial` and `_.rest`.
+arrayEach(['initial', 'rest'], function(methodName, index) {
+  var dropName = 'drop' + (index ? '' : 'Right');
 
-    lodash.prototype[methodName] = function() {
-      var chainAll = this.__chain__,
-          value = this.__wrapped__,
-          result = func.apply(value, arguments);
+  LazyWrapper.prototype[methodName] = function() {
+    return this[dropName](1);
+  };
+});
 
-      if (value.length === 0) {
-        delete value[0];
-      }
-      return (chainAll || isSplice)
-        ? new lodashWrapper(result, chainAll)
-        : result;
-    };
+// Add `LazyWrapper` methods for `_.pluck` and `_.where`.
+arrayEach(['pluck', 'where'], function(methodName, index) {
+  var operationName = index ? 'filter' : 'map',
+      createCallback = index ? matches : property;
+
+  LazyWrapper.prototype[methodName] = function(value) {
+    return this[operationName](createCallback(value));
+  };
+});
+
+LazyWrapper.prototype.dropWhile = function(iteratee, thisArg) {
+  var done,
+      lastIndex,
+      isRight = this.dir < 0;
+
+  iteratee = baseCallback(iteratee, thisArg, 3);
+  return this.filter(function(value, index, array) {
+    done = done && (isRight ? index < lastIndex : index > lastIndex);
+    lastIndex = index;
+    return done || (done = !iteratee(value, index, array));
   });
-}
+};
+
+LazyWrapper.prototype.reject = function(iteratee, thisArg) {
+  iteratee = baseCallback(iteratee, thisArg, 3);
+  return this.filter(function(value, index, array) {
+    return !iteratee(value, index, array);
+  });
+};
+
+LazyWrapper.prototype.slice = function(start, end) {
+  start = start == null ? 0 : (+start || 0);
+  var result = start < 0 ? this.takeRight(-start) : this.drop(start);
+
+  if (typeof end != 'undefined') {
+    end = (+end || 0);
+    result = end < 0 ? result.dropRight(-end) : result.take(end - start);
+  }
+  return result;
+};
+
+// Add `LazyWrapper` methods to `lodash.prototype`.
+baseForOwn(LazyWrapper.prototype, function(func, methodName) {
+  var retUnwrapped = /^(?:first|last)$/.test(methodName);
+
+  lodash.prototype[methodName] = function() {
+    var value = this.__wrapped__,
+        args = arguments,
+        chainAll = this.__chain__,
+        isHybrid = !!this.__actions__.length,
+        isLazy = value instanceof LazyWrapper,
+        onlyLazy = isLazy && !isHybrid;
+
+    if (retUnwrapped && !chainAll) {
+      return onlyLazy
+        ? func.call(value)
+        : lodash[methodName](this.value());
+    }
+    var interceptor = function(value) {
+      var otherArgs = [value];
+      push.apply(otherArgs, args);
+      return lodash[methodName].apply(lodash, otherArgs);
+    };
+    if (isLazy || isArray(value)) {
+      var wrapper = onlyLazy ? value : new LazyWrapper(this),
+          result = func.apply(wrapper, args);
+
+      if (!retUnwrapped && (isHybrid || result.actions)) {
+        var actions = result.actions || (result.actions = []);
+        actions.push({ 'func': thru, 'args': [interceptor], 'thisArg': lodash });
+      }
+      return new LodashWrapper(result, chainAll);
+    }
+    return this.thru(interceptor);
+  };
+});
+
+// Add `Array.prototype` functions to `lodash.prototype`.
+arrayEach(['concat', 'join', 'pop', 'push', 'shift', 'sort', 'splice', 'unshift'], function(methodName) {
+  var arrayFunc = arrayProto[methodName],
+      chainName = /^(?:push|sort|unshift)$/.test(methodName) ? 'tap' : 'thru',
+      fixObjects = !support.spliceObjects && /^(?:pop|shift|splice)$/.test(methodName),
+      retUnwrapped = /^(?:join|pop|shift)$/.test(methodName);
+
+  // Avoid array-like object bugs with `Array#shift` and `Array#splice` in
+  // IE < 9, Firefox < 10, Narwhal, and RingoJS.
+  var func = !fixObjects ? arrayFunc : function() {
+    var result = arrayFunc.apply(this, arguments);
+    if (this.length === 0) {
+      delete this[0];
+    }
+    return result;
+  };
+
+  lodash.prototype[methodName] = function() {
+    var args = arguments;
+    if (retUnwrapped && !this.__chain__) {
+      return func.apply(this.value(), args);
+    }
+    return this[chainName](function(value) {
+      return func.apply(value, args);
+    });
+  };
+});
+
+// Add functions to the lazy wrapper.
+LazyWrapper.prototype.clone = lazyClone;
+LazyWrapper.prototype.reverse = lazyReverse;
+LazyWrapper.prototype.value = lazyValue;
+
+// Add chaining functions to the lodash wrapper.
+lodash.prototype.chain = chain.wrapperChain;
+lodash.prototype.reverse = chain.reverse;
+lodash.prototype.toString = chain.toString;
+lodash.prototype.toJSON = lodash.prototype.valueOf = lodash.prototype.value = chain.value;
+
+// Add function aliases to the lodash wrapper.
+lodash.prototype.collect = lodash.prototype.map;
+lodash.prototype.head = lodash.prototype.first;
+lodash.prototype.select = lodash.prototype.filter;
+lodash.prototype.tail = lodash.prototype.rest;
 
 module.exports = lodash;

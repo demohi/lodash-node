@@ -1,6 +1,6 @@
 {
   "name": "lodash-node",
-  "version": "3.0.0-pre",
+  "version": "3.0.0",
   "description": "Lo-Dash methods exported as Node.js/io.js modules.",
   "icon": "https://lodash.com/icon.svg",
   "license": "MIT",

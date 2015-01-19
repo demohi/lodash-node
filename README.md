@@ -1,4 +1,4 @@
-# lodash-node v3.0.0-pre
+# lodash-node v3.0.0
 
 [Lo-Dash](https://lodash.com/) methods exported as [Node.js](http://nodejs.org/)/[io.js](https://iojs.org/) modules.
 
